@@ -23,13 +23,13 @@ class Rocsparse(CMakePackage):
     depends_on('cmake@3:', type='build')
     depends_on('boost', type='build')
     for ver in ['3.5.0']:
-        depends_on('hip@' + ver, type='build', when='@' + ver)
+        depends_on('hip@' + ver, when='@' + ver)
         depends_on('rocm-device-libs@' + ver, type='build', when='@' + ver)
         depends_on('comgr@' + ver, type='build', when='@' + ver)
         depends_on('rocprim@' + ver, type='build', when='@' + ver)
         depends_on('llvm-amdgpu@' + ver, type='build', when='@' + ver)
         depends_on('rocminfo@' + ver, type='build', when='@' + ver)
-        depends_on('hsa-rocr-dev@' + ver, type='build', when='@' + ver)
+        depends_on('hsa-rocr-dev@' + ver, type='link', when='@' + ver)
 
     def setup_build_environment(self, env):
         env.set('CXX', self.spec['hip'].hipcc)
