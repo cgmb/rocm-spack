@@ -7,6 +7,7 @@
 from spack import *
 import shutil
 
+
 class RocmSmiLib(CMakePackage):
     """It is a C library for Linux that provides a user space interface
        for applications to monitor and control GPU applications."""
@@ -25,5 +26,5 @@ class RocmSmiLib(CMakePackage):
     @run_after('install')
     def post_install(self):
         shutil.rmtree(self.prefix.lib)
-        copy_tree(self.prefix.rocm_smi,  self.prefix)
+        install_tree(self.prefix.rocm_smi,  self.prefix)
         shutil.rmtree(self.prefix.rocm_smi)
