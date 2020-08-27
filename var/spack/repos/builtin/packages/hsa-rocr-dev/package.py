@@ -26,17 +26,16 @@ class HsaRocrDev(CMakePackage):
     depends_on('cmake@3:', type="build")
     for ver in ['3.5.0', '3.7.0']:
         depends_on('hsakmt-roct@' + ver, type=('link', 'run'), when='@' + ver)
-        depends_on('llvm-amdgpu@' + ver, type=('link', 'run'), when='@' + ver)
         depends_on('libelf@0.8:', type='link', when="@" + ver)
+        if ver >= '3.7.0':
+            depends_on('llvm-amdgpu@' + ver, type=('link', 'run'), when='@' + ver)
 
     patch('0001-Do-not-set-an-explicit-rpath-by-default-since-packag.patch', when='@3.5.0')
 
     root_cmakelists_dir = 'src'
 
     def cmake_args(self):
-        libelf_include = self.spec['libelf'].prefix.include.libelf
-        args = [
-            '-DLIBELF_INCLUDE_DIRS=%s' % libelf_include,
-            '-DIMAGE_SUPPORT=OFF'
-        ]
+        args = []
+        if self.spec.version >= Version('3.7.0'):
+            args = [ '-DIMAGE_SUPPORT=OFF' ]
         return args
