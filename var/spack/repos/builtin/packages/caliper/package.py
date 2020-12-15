@@ -53,10 +53,11 @@ class Caliper(CMakePackage):
             description='Enable sampling support on Linux')
     variant('sosflow', default=False,
             description='Enable SOSflow support')
+    variant('fortran', default=False,
+            description='Enable Fortran support')
 
     depends_on('adiak@0.1:0.99', when='@2.2: +adiak')
 
-    depends_on('dyninst@9.3.0:9.99', when='@:1.99 +dyninst')
     depends_on('dyninst@10.0:10.99', when='@2: +dyninst')
 
     depends_on('papi@5.3:5.99', when='@:2.2 +papi')
@@ -76,6 +77,12 @@ class Caliper(CMakePackage):
     conflicts('+sosflow', '@2.0.0:2.4.99')
     conflicts('+adiak', '@:2.1.99')
 
+    # The Dyninst 9.X used by v1.9.X is deprecated
+    conflicts('+dyninst', when='@:1.99',
+              msg='Dyninst unsupported by version <=2.0.1')
+
+    patch('for_aarch64.patch', when='target=aarch64:')
+
     def cmake_args(self):
         spec = self.spec
 
@@ -93,7 +100,8 @@ class Caliper(CMakePackage):
             '-DWITH_LIBPFM=%s'   % ('On' if '+libpfm'   in spec else 'Off'),
             '-DWITH_SOSFLOW=%s'  % ('On' if '+sosflow'  in spec else 'Off'),
             '-DWITH_SAMPLER=%s'  % ('On' if '+sampler'  in spec else 'Off'),
-            '-DWITH_MPI=%s'      % ('On' if '+mpi'      in spec else 'Off')
+            '-DWITH_MPI=%s'      % ('On' if '+mpi'      in spec else 'Off'),
+            '-DWITH_FORTRAN=%s'  % ('On' if '+fortran'  in spec else 'Off')
         ]
 
         if '+papi' in spec:
