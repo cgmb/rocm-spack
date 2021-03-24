@@ -1,4 +1,4 @@
-.. Copyright 2013-2020 Lawrence Livermore National Security, LLC and other
+.. Copyright 2013-2021 Lawrence Livermore National Security, LLC and other
    Spack Project Developers. See the top-level COPYRIGHT file for details.
 
    SPDX-License-Identifier: (Apache-2.0 OR MIT)
@@ -611,6 +611,62 @@ it executable, then runs it with some arguments.
        set_executable(self.stage.archive_file)
        installer = Executable(self.stage.archive_file)
        installer('--prefix=%s' % prefix, 'arg1', 'arg2', 'etc.')
+
+
+^^^^^^^^^^^^^^^^^^^^^^^^
+Deprecating old versions
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+There are many reasons to remove old versions of software:
+
+#. Security vulnerabilities (most serious reason)
+#. Changing build systems that increase package complexity
+#. Changing dependencies/patches/resources/flags that increase package complexity
+#. Maintainer/developer inability/unwillingness to support old versions
+#. No longer available for download (right to be forgotten)
+#. Package or version rename
+
+At the same time, there are many reasons to keep old versions of software:
+
+#. Reproducibility
+#. Requirements for older packages (e.g. some packages still rely on Qt 3)
+
+In general, you should not remove old versions from a ``package.py``. Instead,
+you should first deprecate them using the following syntax:
+
+.. code-block:: python
+
+   version('1.2.3', sha256='...', deprecated=True)
+
+
+This has two effects. First, ``spack info`` will no longer advertise that
+version. Second, commands like ``spack install`` that fetch the package will
+require user approval:
+
+.. code-block:: console
+
+   $ spack install openssl@1.0.1e
+   ==> Warning: openssl@1.0.1e is deprecated and may be removed in a future Spack release.
+   ==>   Fetch anyway? [y/N]
+
+
+If you use ``spack install --deprecated``, this check can be skipped.
+
+This also applies to package recipes that are renamed or removed. You should
+first deprecate all versions before removing a package. If you need to rename
+it, you can deprecate the old package and create a new package at the same
+time.
+
+Version deprecations should always last at least one Spack minor release cycle
+before the version is completely removed. For example, if a version is
+deprecated in Spack 0.16.0, it should not be removed until Spack 0.17.0. No
+version should be removed without such a deprecation process. This gives users
+a chance to complain about the deprecation in case the old version is needed
+for some application. If you require a deprecated version of a package, simply
+submit a PR to remove ``deprecated=True`` from the package. However, you may be
+asked to help maintain this version of the package if the current maintainers
+are unwilling to support this older version.
+
 
 ^^^^^^^^^^^^^^^^
 Download caching
@@ -1864,14 +1920,21 @@ of ``mpich`` using the following command:
 
    $ srun -N 2 -n 8 spack install -j 4 mpich@3.3.2
 
-This will create eight concurrent four-job installation on two different
+This will create eight concurrent, four-job installs on two different
 nodes.
+
+Alternatively, you could run the same installs on one node by entering
+the following at the command line of a bash shell:
+
+.. code-block:: console
+
+   $ for i in {1..12}; do nohup spack install -j 4 mpich@3.3.2 >> mpich_install.txt 2>&1 &; done
 
 .. note::
 
-   The effective parallelism will be based on the maximum number of
-   packages that can be installed at the same time, which will limited
-   by the number of packages with no (remaining) uninstalled dependencies.
+   The effective parallelism is based on the maximum number of packages
+   that can be installed at the same time, which is limited by the
+   number of packages with no (remaining) uninstalled dependencies.
 
 
 .. _dependencies:
@@ -2737,11 +2800,13 @@ The classes that are currently provided by Spack are:
     |                               | built using CMake                |
     +-------------------------------+----------------------------------+
     | :py:class:`.CudaPackage`      | A helper class for packages that |
-    |                               | use CUDA. It is intended to be   |
-    |                               | used in combination with others  |
+    |                               | use CUDA                         |
     +-------------------------------+----------------------------------+
     | :py:class:`.QMakePackage`     | Specialized class for packages   |
     |                               | build using QMake                |
+    +-------------------------------+----------------------------------+
+    | :py:class:`.ROCmPackage`      | A helper class for packages that |
+    |                               | use ROCm                         |
     +-------------------------------+----------------------------------+
     | :py:class:`.SConsPackage`     | Specialized class for packages   |
     |                               | built using SCons                |
@@ -3946,7 +4011,7 @@ using the ``run_before`` decorator.
 
     The API for adding tests is not yet considered stable and may change drastically in future releases.
 
-.. _file-manipulation:
+.. _cmd-spack-test:
 
 ^^^^^^^^^^^^^
 Install Tests
@@ -4007,8 +4072,11 @@ the package being tested when ``installed`` is ``True``.
 The executable runs in ``work_dir``, when specified, using the provided
 ``options``. The return code is checked against the ``status`` argument,
 which can be an integer or list of integers representing status codes
-corresponding to successful execution. Spack also checks that every string
-in ``expected`` is a regex matching part of the output from the test run.
+corresponding to successful execution (e.g. ``status=[0,3,7]``).
+Spack also checks that every string in ``expected`` is a regex matching
+part of the output from the test run (e.g.
+``expected=['completed successfully', 'converged in']``). Default behavior
+is to behave as though ``status=[0]`` and ``expected=[]`` are specified.
 
 Output from the test is written to its log file. The ``purpose`` argument
 serves as the heading in text logs to highlight the start of each test part.
@@ -4055,9 +4123,9 @@ are copied **after** the package is installed during the build process.
 The method copies files to the package's metadata directory under
 the ``self.install_test_root``. All files in the package source's
 ``tests`` directory for the example above will be copied to the
-``join_path(self.install_test_root, 'tests')`` directory. The files
-will be copied to the ``join_path(self.install_test_root, 'examples')``
-directory.
+``join_path(self.install_test_root, 'tests')`` directory. The two
+files listed under the staged ``examples`` directory will be copied
+to the ``join_path(self.install_test_root, 'examples')`` directory.
 
 .. note::
 
@@ -4082,7 +4150,7 @@ that directory to the test staging directory during install testing.
 The ``test`` method can access those files from the
 ``self.test_suite.current_test_data_dir`` directory.
 
-.. _cmd-spack-test:
+.. _cmd-spack-test-list:
 
 """""""""""""""""""
 ``spack test list``
@@ -4091,6 +4159,8 @@ The ``test`` method can access those files from the
 Packages available for install testing can be found using the
 ``spack test list`` command. The command outputs all installed
 packages that have defined ``test`` methods.
+
+.. _cmd-spack-test-run:
 
 """"""""""""""""""
 ``spack test run``
@@ -4114,6 +4184,8 @@ Test output is written to a text log file by default but ``junit``
 and ``cdash`` are outputs are available through the ``--log-format``
 option.
 
+.. _cmd-spack-test-results:
+
 """"""""""""""""""""""
 ``spack test results``
 """"""""""""""""""""""
@@ -4128,12 +4200,16 @@ test(s) to facilitate debugging.
 The ``--failed`` option limits results shown to that of the failed
 tests, if any, of matching packages.
 
+.. _cmd-spack-test-find:
+
 """""""""""""""""""
 ``spack test find``
 """""""""""""""""""
 
 The ``spack test find`` command lists the aliases or content hashes
 of all test suites whose results are available.
+
+.. _cmd-spack-test-remove:
 
 """""""""""""""""""""
 ``spack test remove``
@@ -4142,6 +4218,8 @@ of all test suites whose results are available.
 The ``spack test remove`` command removes test suites to declutter
 the test results directory. You are prompted to confirm the removal
 of each test suite **unless** you use the ``--yes-to-all`` option.
+
+.. _file-manipulation:
 
 ---------------------------
 File manipulation functions
