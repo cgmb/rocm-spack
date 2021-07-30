@@ -3,26 +3,27 @@
 #
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
+import collections
+import itertools as it
 import json
 import os
+
 import pytest
 
 import llnl.util.filesystem as fs
 
 import spack.ci as ci
+import spack.ci_needs_workaround as cinw
+import spack.ci_optimization as ci_opt
+import spack.config as cfg
 import spack.environment as ev
 import spack.error
 import spack.main as spack_main
-import spack.config as cfg
 import spack.paths as spack_paths
 import spack.spec as spec
 import spack.util.gpg
-
-import spack.ci_optimization as ci_opt
-import spack.ci_needs_workaround as cinw
 import spack.util.spack_yaml as syaml
-import itertools as it
-import collections
+
 try:
     # dynamically import to keep vermin from complaining
     collections_abc = __import__('collections.abc')
@@ -56,8 +57,6 @@ def test_urlencode_string():
     assert(s_enc == 'Spack+Test+Project')
 
 
-@pytest.mark.skipif(not spack.util.gpg.has_gpg(),
-                    reason='This test requires gpg')
 def test_import_signing_key(mock_gnupghome):
     signing_key_dir = spack_paths.mock_gpg_keys_path
     signing_key_path = os.path.join(signing_key_dir, 'package-signing-key')
@@ -181,7 +180,7 @@ def test_register_cdash_build(monkeypatch):
 
 
 def test_relate_cdash_builds(config, mutable_mock_env_path, mock_packages,
-                             monkeypatch):
+                             monkeypatch, capfd):
     e = ev.create('test1')
     e.add('dyninst')
     e.concretize()
@@ -230,9 +229,11 @@ def test_relate_cdash_builds(config, mutable_mock_env_path, mock_packages,
         }
 
         fake_responder._resp_code = 400
-        with pytest.raises(spack.error.SpackError):
-            ci.relate_cdash_builds(spec_map, cdash_api_url, job_build_id,
-                                   cdash_project, [cdashids_mirror_url])
+        ci.relate_cdash_builds(spec_map, cdash_api_url, job_build_id,
+                               cdash_project, [cdashids_mirror_url])
+        out, err = capfd.readouterr()
+        assert('Warning: Relate builds' in err)
+        assert('failed' in err)
 
         dep_cdash_ids = {}
 
