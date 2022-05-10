@@ -6,6 +6,7 @@
 import itertools
 
 from spack import *
+from spack.build_systems.rocm import ROCmPackage
 
 
 class Rocsolver(CMakePackage):
@@ -18,10 +19,8 @@ class Rocsolver(CMakePackage):
 
     maintainers = ['srekolam', 'arjun-raj-kuppala', 'haampie']
 
-    amdgpu_targets = (
-        'gfx803', 'gfx900', 'gfx906:xnack-', 'gfx908:xnack-',
-        'gfx90a:xnack-', 'gfx90a:xnack+', 'gfx1010', 'gfx1011', 'gfx1012', 'gfx1030'
-    )
+    amdgpu_targets = ROCmPackage.amdgpu_targets
+
     variant('amdgpu_target', values=auto_or_any_combination_of(*amdgpu_targets))
     variant('optimal', default=True,
             description='This option improves performance at the cost of increased binary \
