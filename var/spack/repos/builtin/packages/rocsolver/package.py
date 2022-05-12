@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: (Apache-2.0 OR MIT)
 
 import itertools
+import llnl.util.tty as tty
 
 from spack import *
 from spack.build_systems.rocm import ROCmPackage
@@ -66,6 +67,23 @@ class Rocsolver(CMakePackage):
                        when='@{0} amdgpu_target={1}'.format(ver, tgt))
         depends_on('rocm-cmake@%s:' % ver, type='build', when='@' + ver)
 
+    def check_arch(self):
+        target_support_spec = {
+            'auto' : '@:',
+            'gfx803': '@3.5.0:4.0.0',
+            'gfx900': '@3.5.0:4.5.2',
+            'gfx906': '@3.5.0:4.0.0',
+            'gfx906:xnack-': '@4.1.0:',
+            'gfx908': '@4.0.0',
+            'gfx908:xnack-': '@4.1.0:',
+            'gfx90a:xnack-': '@4.3.0:',
+            'gfx90a:xnack+': '@4.3.0:',
+            'gfx1030': '@4.3.0:',
+        }
+        for tgt in self.spec.variants['amdgpu_target'].value:
+            if tgt not in target_support_spec or not self.spec.satisfies(target_support_spec[tgt]):
+                tty.warn('{0} is not a tested architecture'.format(tgt))
+
     def cmake_args(self):
         args = [
             self.define('BUILD_CLIENTS_SAMPLES', 'OFF'),
@@ -82,6 +100,7 @@ class Rocsolver(CMakePackage):
         if self.spec.satisfies('@3.7.0:'):
             args.append(self.define_from_variant('OPTIMAL', 'optimal'))
 
+        self.check_arch()
         tgt = self.spec.variants['amdgpu_target']
         if 'auto' not in tgt:
             if '@:3.8.0' in self.spec:
